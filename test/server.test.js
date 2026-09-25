@@ -1,14 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const app = require('../src/server');
+const { createApp } = require('../src/app');
 const { openDatabase } = require('../src/database');
 
 test('健康接口和SQLite基础迁移可用', async () => {
   const db = openDatabase(':memory:');
-  const row = db.prepare('SELECT COUNT(*) AS count FROM schema_versions').get();
-  assert.equal(row.count, 1);
-  db.close();
+  const versions = db.prepare('SELECT version FROM schema_versions ORDER BY version').all().map((row) => row.version);
+  assert.deepEqual(versions, [1, 2]);
+  const app = createApp(db);
   const server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   const { port } = server.address();
@@ -20,6 +20,7 @@ test('健康接口和SQLite基础迁移可用', async () => {
     }).on('error', reject);
   });
   await new Promise((resolve) => server.close(resolve));
+  db.close();
   assert.equal(result.status, 200);
   assert.deepEqual(JSON.parse(result.body), { status: 'ok' });
 });
